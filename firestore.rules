@@ -1,0 +1,132 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // 0. Global Safety Net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- HARDENED HELPERS ---
+    
+    function isSignedIn() {
+      // Mandating verification as per Pillar 8 & verified constraint
+      return request.auth != null && request.auth.token.email_verified == true;
+    }
+
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function getRole() {
+      return getUserData().role;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && (getRole() == 'admin' || request.auth.token.email == 'inboxacolombia@gmail.com');
+    }
+
+    function isSeller() {
+      return isSignedIn() && getRole() == 'seller';
+    }
+
+    function isWarehouse() {
+      return isSignedIn() && getRole() == 'warehouse';
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // --- ENTITY VALIDATIONS ---
+
+    function isValidUser(data) {
+      return data.email is string && data.email.size() <= 200 &&
+             data.role in ['seller', 'warehouse', 'admin'] &&
+             data.keys().hasAll(['email', 'role', 'createdAt']) &&
+             data.keys().size() == 3;
+    }
+
+    function isValidProduct(data) {
+      return data.code is string && data.code.size() <= 50 &&
+             data.name is string && data.name.size() <= 200 &&
+             data.price is number && data.price >= 0 &&
+             data.stock is number && data.stock >= 0 &&
+             data.keys().hasAll(['code', 'name', 'price', 'stock', 'updatedAt']);
+    }
+
+    function isValidOrder(data) {
+      return data.customerPhone is string && data.customerPhone.size() <= 20 &&
+             data.items is list && data.items.size() > 0 && data.items.size() <= 50 &&
+             data.total is number && data.total >= 0 &&
+             data.status in ['Solicitado', 'Validado', 'En Preparación', 'Despachado', 'Finalizado/Pagado', 'Mora/Reclamo'] &&
+             data.sellerId == request.auth.uid &&
+             data.keys().hasAll(['customerPhone', 'items', 'total', 'status', 'sellerId', 'createdAt', 'updatedAt']);
+    }
+
+    // --- COLLECTIONS ---
+
+    match /users/{userId} {
+      allow get: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+      allow list: if isAdmin();
+      
+      allow create: if isSignedIn() && request.auth.uid == userId && 
+                       isValidUser(incoming()) && incoming().role == 'seller'; 
+      
+      allow update: if (isAdmin() || (request.auth.uid == userId)) && 
+                       isValidUser(incoming()) && 
+                       incoming().diff(existing()).affectedKeys().hasOnly(['role', 'name']);
+    }
+
+    match /products/{productId} {
+      allow read: if isSignedIn();
+      allow create: if isAdmin() && isValidProduct(incoming());
+      
+      allow update: if isSignedIn() && isValidProduct(incoming()) && (
+        isAdmin() || 
+        (isSeller() && incoming().diff(existing()).affectedKeys().hasOnly(['stock', 'updatedAt']))
+      );
+    }
+
+    match /orders/{orderId} {
+      // isValidId(orderId) guard omitted for list as per Pillar 3
+      allow get: if isSignedIn() && isValidId(orderId) && (
+        isAdmin() || 
+        isWarehouse() || 
+        (isSeller() && existing().sellerId == request.auth.uid)
+      );
+
+      allow list: if isSignedIn() && (
+        isAdmin() || 
+        isWarehouse() || 
+        (isSeller() && resource.data.sellerId == request.auth.uid)
+      );
+
+      allow create: if isSeller() && isValidOrder(incoming()) && 
+                       incoming().status == 'Solicitado' &&
+                       incoming().createdAt == request.time;
+
+      allow update: if isSignedIn() && isValidId(orderId) && (
+        // Admin: Full control over status and payments
+        (isAdmin() && incoming().diff(existing()).affectedKeys().hasAny(['status', 'paidAt', 'updatedAt'])) ||
+        
+        // Seller: Registration of seller notes or similar
+        (isSeller() && existing().sellerId == request.auth.uid && existing().status == 'Solicitado') ||
+        
+        // Warehouse: Logistics progression
+        (isWarehouse() && (
+          (existing().status == 'Validado' && incoming().status == 'En Preparación') ||
+          (existing().status == 'En Preparación' && incoming().status == 'Despachado')
+        ) && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt']))
+      );
+    }
+  }
+}

@@ -1,0 +1,88 @@
+import React, { useState } from 'react';
+import { BrowserRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom';
+import { SellerView } from './views/SellerView';
+import { WarehouseView } from './views/WarehouseView';
+import { AdminView } from './views/AdminView';
+import { SettingsView } from './views/SettingsView';
+import { LoginView } from './views/LoginView';
+import { UserRole } from './types';
+import { Navigation } from './components/Navigation';
+
+import { AuthProvider, useAuth } from './components/AuthProvider';
+import { auth } from './firebase';
+
+export default function App() {
+  return (
+    <AuthProvider>
+      <AppRouter />
+    </AuthProvider>
+  );
+}
+
+function AppRouter() {
+  const { profile, loading } = useAuth();
+  
+  // State for demo role selection if no profile exists
+  const [demoRole, setDemoRole] = useState<UserRole | null>(null);
+
+  const activeUser = profile || (demoRole ? { role: demoRole, name: 'Demo User' } : null);
+
+  if (loading) {
+    return (
+      <div className="h-screen w-screen flex items-center justify-center bg-inboxa-gray">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-inboxa-coral"></div>
+      </div>
+    );
+  }
+
+  const handleLogout = () => {
+    if (auth) auth.signOut();
+    setDemoRole(null);
+  };
+
+  if (!activeUser) {
+    return <LoginView onLogin={(role) => setDemoRole(role)} />;
+  }
+
+  return (
+    <BrowserRouter>
+      <Routes>
+        <Route path="/" element={<Layout role={activeUser.role} onLogout={handleLogout} />}>
+          <Route index element={<Navigate to={`/${activeUser.role}`} replace />} />
+          
+          <Route 
+            path="seller" 
+            element={activeUser.role === 'seller' || activeUser.role === 'admin' ? <SellerView /> : <Navigate to="/" />} 
+          />
+          
+          <Route 
+            path="warehouse" 
+            element={activeUser.role === 'warehouse' || activeUser.role === 'admin' ? <WarehouseView /> : <Navigate to="/" />} 
+          />
+          
+          <Route 
+            path="admin" 
+            element={activeUser.role === 'admin' ? <AdminView /> : <Navigate to="/" />} 
+          />
+
+          <Route 
+            path="settings" 
+            element={activeUser.role === 'admin' ? <SettingsView /> : <Navigate to="/" />} 
+          />
+        </Route>
+      </Routes>
+    </BrowserRouter>
+  );
+}
+
+// Side Layout Component
+const Layout: React.FC<{ role: UserRole; onLogout: () => void }> = ({ role, onLogout }) => {
+  return (
+    <div className="flex min-h-screen bg-inboxa-gray text-white">
+      <Navigation role={role} onLogout={onLogout} />
+      <main className="flex-1 lg:ml-64 min-h-screen overflow-x-hidden">
+        <Outlet />
+      </main>
+    </div>
+  );
+};

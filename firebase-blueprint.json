@@ -1,0 +1,64 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile with role-based access control",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string", "format": "email" },
+        "name": { "type": "string" },
+        "role": { "type": "string", "enum": ["seller", "warehouse", "admin"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["email", "role"]
+    },
+    "Product": {
+      "title": "Product",
+      "description": "Inventory product with stock tracking",
+      "type": "object",
+      "properties": {
+        "code": { "type": "string", "description": "Unique product code/SKU" },
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "price": { "type": "number" },
+        "stock": { "type": "number", "description": "Current available quantity" },
+        "imageUrl": { "type": "string" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["code", "name", "price", "stock"]
+    },
+    "Order": {
+      "title": "Order",
+      "description": "Sales order lifecycle",
+      "type": "object",
+      "properties": {
+        "customerPhone": { "type": "string" },
+        "customerName": { "type": "string" },
+        "customerFidelity": { "type": "string", "enum": ["Nuevo", "Conocido", "Amigo de Confianza", "Amigo Especial"] },
+        "items": { "type": "array" },
+        "total": { "type": "number" },
+        "status": { "type": "string", "enum": ["Solicitado", "Validado", "En Preparación", "Despachado", "Finalizado/Pagado", "Mora/Reclamo"] },
+        "sellerId": { "type": "string" },
+        "trackingNumber": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" },
+        "paidAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["customerPhone", "items", "total", "status", "sellerId", "createdAt"]
+    }
+  },
+  "firestore": {
+    "users": {
+      "schema": "User",
+      "description": "Registered users and their roles"
+    },
+    "products": {
+      "schema": "Product",
+      "description": "Inventory products"
+    },
+    "orders": {
+      "schema": "Order",
+      "description": "Order records for sales and logistics tracking"
+    }
+  }
+}

@@ -1,0 +1,58 @@
+export type UserRole = 'seller' | 'warehouse' | 'admin';
+
+export interface UserProfile {
+  uid: string;
+  email: string;
+  name?: string;
+  role: UserRole;
+  createdAt: any;
+}
+
+export interface Product {
+  id: string;
+  code: string;
+  name: string;
+  description?: string;
+  price: number;
+  stock: number;
+  imageUrl?: string;
+  updatedAt: any;
+}
+
+export type OrderStatus = 
+  | 'Solicitado' 
+  | 'Validado' 
+  | 'En Preparación' 
+  | 'Despachado' 
+  | 'Finalizado/Pagado' 
+  | 'Mora/Reclamo';
+
+export type CustomerFidelity = 
+  | 'Nuevo' 
+  | 'Conocido' 
+  | 'Amigo de Confianza' 
+  | 'Amigo Especial';
+
+export interface OrderItem {
+  productId: string;
+  code: string;
+  name: string;
+  price: number;
+  quantity: number;
+}
+
+export interface Order {
+  id: string;
+  customerPhone: string;
+  customerName?: string;
+  customerFidelity: CustomerFidelity;
+  items: OrderItem[];
+  total: number;
+  status: OrderStatus;
+  sellerId: string;
+  sellerName?: string;
+  trackingNumber?: string;
+  createdAt: any;
+  updatedAt: any;
+  paidAt?: any;
+}
