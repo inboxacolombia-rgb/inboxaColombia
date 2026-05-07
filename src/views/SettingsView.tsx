@@ -5,7 +5,12 @@ import { motion } from 'motion/react';
 export const SettingsView: React.FC = () => {
   return (
     <div className="flex flex-col gap-8 p-4 lg:p-8 h-full">
-      <div>
+      <div className="pt-10 lg:pt-0 text-center lg:text-left flex flex-col items-center lg:items-start">
+        <img 
+          src="/logo/logo%20inboxa.jpg" 
+          alt="INBOXA Logo" 
+          className="w-20 h-20 rounded-xl mb-4 lg:hidden shadow-lg border border-white/10"
+        />
         <h2 className="text-3xl font-display font-bold">Ajustes del Sistema</h2>
         <p className="text-white/60">Configuración de integraciones y seguridad.</p>
       </div>
@@ -45,7 +50,7 @@ export const SettingsView: React.FC = () => {
 
         {/* Security & Access */}
         <div className="card-glass p-6 flex flex-col gap-6">
-          <div className="flex items-center gap-3 text-blue-400">
+          <div className="flex items-center gap-3 text-white/60">
             <ShieldCheck size={24} />
             <h3 className="text-xl font-bold">Seguridad de Roles</h3>
           </div>

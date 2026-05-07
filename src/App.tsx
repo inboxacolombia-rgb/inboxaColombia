@@ -5,6 +5,7 @@ import { WarehouseView } from './views/WarehouseView';
 import { AdminView } from './views/AdminView';
 import { SettingsView } from './views/SettingsView';
 import { LoginView } from './views/LoginView';
+import { InventoryView } from './views/InventoryView';
 import { UserRole } from './types';
 import { Navigation } from './components/Navigation';
 
@@ -63,6 +64,11 @@ function AppRouter() {
           <Route 
             path="admin" 
             element={activeUser.role === 'admin' ? <AdminView /> : <Navigate to="/" />} 
+          />
+
+          <Route 
+            path="inventory" 
+            element={<InventoryView userRole={activeUser.role} />} 
           />
 
           <Route 

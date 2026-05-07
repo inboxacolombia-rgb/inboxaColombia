@@ -1,10 +1,8 @@
 import React, { useState } from 'react';
-import { ShoppingCart, Package, ShieldCheck, Mail, Lock, LogIn, ChevronLeft } from 'lucide-react';
+import { ShoppingCart, Package, ShieldCheck } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { UserRole } from '../types';
 import { cn } from '../lib/utils';
-import { auth } from '../firebase';
-import { signInWithEmailAndPassword } from 'firebase/auth';
 
 interface LoginViewProps {
   onLogin: (role: UserRole) => void;
@@ -12,10 +10,7 @@ interface LoginViewProps {
 
 export const LoginView: React.FC<LoginViewProps> = ({ onLogin }) => {
   const [selectedRole, setSelectedRole] = useState<UserRole | null>(null);
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   const roles = [
     {
@@ -30,7 +25,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLogin }) => {
       title: 'Bodega (Logística)',
       description: 'Gestión de empaques, despachos y estados de envío.',
       icon: Package,
-      color: 'bg-blue-500'
+      color: 'bg-slate-600'
     },
     {
       id: 'admin' as UserRole,
@@ -41,36 +36,22 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLogin }) => {
     }
   ];
 
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!auth) {
-      // Demo mode if firebase not ready
-      onLogin(selectedRole!);
-      return;
-    }
-
+  const handleRoleSelect = (role: UserRole) => {
     setLoading(true);
-    setError(null);
-    try {
-      await signInWithEmailAndPassword(auth, email, password);
-      // AuthProvider will detect the change
-    } catch (err: any) {
-      console.error(err);
-      setError('Error al iniciar sesión. Verifica tus credenciales.');
-      // If error is "config not found", fall back to demo
-      if (err.message?.includes('not found')) {
-        onLogin(selectedRole!);
-      }
-    } finally {
+    setSelectedRole(role);
+    
+    // Simulate a brief loading state for better UX
+    setTimeout(() => {
       setLoading(false);
-    }
+      onLogin(role);
+    }, 800);
   };
 
   return (
     <div className="min-h-screen bg-inboxa-gray flex flex-col items-center justify-center p-6 relative overflow-hidden">
       {/* Background decoration */}
-      <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-inboxa-coral/10 rounded-full blur-[120px]" />
-      <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-blue-500/10 rounded-full blur-[120px]" />
+      <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-inboxa-coral/5 rounded-full blur-[120px]" />
+      <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-inboxa-yellow/5 rounded-full blur-[120px]" />
 
       <motion.div 
         layout
@@ -90,7 +71,18 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLogin }) => {
         </div>
 
         <AnimatePresence mode="wait">
-          {!selectedRole ? (
+          {loading ? (
+            <motion.div 
+              key="loading"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="flex flex-col items-center gap-4"
+            >
+              <div className="w-12 h-12 border-4 border-inboxa-coral/20 border-t-inboxa-coral rounded-full animate-spin" />
+              <p className="text-sm font-bold uppercase tracking-widest text-white/40">Iniciando Sesión...</p>
+            </motion.div>
+          ) : (
             <motion.div 
               key="role-selection"
               initial={{ opacity: 0, x: -20 }}
@@ -106,7 +98,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLogin }) => {
                   transition={{ delay: idx * 0.1 }}
                   whileHover={{ scale: 1.02, translateY: -5 }}
                   whileTap={{ scale: 0.98 }}
-                  onClick={() => setSelectedRole(role.id)}
+                  onClick={() => handleRoleSelect(role.id)}
                   className="card-glass p-8 flex flex-col items-center text-center gap-6 group hover:border-white/20 transition-all border border-white/5"
                 >
                   <div className={cn(
@@ -127,91 +119,11 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLogin }) => {
                 </motion.button>
               ))}
             </motion.div>
-          ) : (
-            <motion.div 
-              key="login-form"
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -20 }}
-              className="w-full max-w-md"
-            >
-              <form onSubmit={handleLogin} className="card-glass p-8 flex flex-col gap-6">
-                <button 
-                  type="button"
-                  onClick={() => setSelectedRole(null)}
-                  className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-white/40 hover:text-white transition-all mb-4 self-start"
-                >
-                  <ChevronLeft size={16} /> Volver
-                </button>
-
-                <div className="flex items-center gap-3">
-                  <div className={cn(
-                    "w-12 h-12 rounded-xl flex items-center justify-center text-white",
-                    roles.find(r => r.id === selectedRole)?.color
-                  )}>
-                    {React.createElement(roles.find(r => r.id === selectedRole)?.icon || ShoppingCart, { size: 24 })}
-                  </div>
-                  <div>
-                    <h2 className="text-xl font-bold">Ingreso: {roles.find(r => r.id === selectedRole)?.title}</h2>
-                    <p className="text-xs text-white/40">Inicia sesión con tus credenciales</p>
-                  </div>
-                </div>
-
-                {error && (
-                  <div className="p-3 bg-red-500/20 border border-red-500/50 rounded-lg text-red-400 text-sm flex items-center gap-2">
-                    <Lock size={16} /> {error}
-                  </div>
-                )}
-
-                <div className="space-y-4">
-                  <div className="flex flex-col gap-1.5">
-                    <label className="text-xs font-bold uppercase tracking-widest text-white/40 flex items-center gap-2">
-                      <Mail size={12} /> Email
-                    </label>
-                    <input 
-                      type="email"
-                      required
-                      placeholder="usuario@inboxa.col"
-                      className="input-field w-full"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                    />
-                  </div>
-
-                  <div className="flex flex-col gap-1.5">
-                    <label className="text-xs font-bold uppercase tracking-widest text-white/40 flex items-center gap-2">
-                      <Lock size={12} /> Contraseña
-                    </label>
-                    <input 
-                      type="password"
-                      required
-                      placeholder="••••••••"
-                      className="input-field w-full"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                    />
-                  </div>
-                </div>
-
-                <button 
-                  type="submit"
-                  disabled={loading}
-                  className="btn-primary h-12 flex items-center justify-center gap-2 font-bold text-lg mt-2"
-                >
-                  {loading ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <LogIn size={20} />}
-                  Acceder
-                </button>
-
-                <p className="text-[10px] text-center text-white/20 uppercase tracking-widest">
-                  El sistema valida roles automáticamente
-                </p>
-              </form>
-            </motion.div>
           )}
         </AnimatePresence>
 
         <p className="text-[10px] text-white/20 uppercase tracking-[0.2em] mt-10">
-          Powered by INBOXA COL & Firebase Enterprise
+          Acceso Directo Habilitado (Entorno de Pruebas)
         </p>
       </motion.div>
     </div>

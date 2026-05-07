@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { cn } from '@/src/lib/utils';
+import { InventoryView } from './InventoryView';
 
 export const AdminView: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'finance' | 'inventory'>('finance');
@@ -18,18 +19,23 @@ export const AdminView: React.FC = () => {
   const stats = [
     { label: 'Ventas Totales', value: '$12,450.00', icon: TrendingUp, delta: '+12.5%', color: 'text-green-400' },
     { label: 'Pedidos en Mora', value: '5', icon: AlertTriangle, delta: '+2 hoy', color: 'text-inboxa-coral' },
-    { label: 'Vendedores Activos', value: '8', icon: Users, delta: 'Live ahora', color: 'text-blue-400' },
+    { label: 'Vendedores Activos', value: '8', icon: Users, delta: 'Live ahora', color: 'text-white/60' },
   ];
 
   return (
     <div className="flex flex-col gap-8 p-4 lg:p-8 h-full">
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-        <div>
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pt-10 lg:pt-0">
+        <div className="text-center lg:text-left flex flex-col items-center lg:items-start">
+          <img 
+            src="/logo/logo%20inboxa.jpg" 
+            alt="INBOXA Logo" 
+            className="w-20 h-20 rounded-xl mb-4 lg:hidden shadow-lg border border-white/10"
+          />
           <h2 className="text-3xl font-display font-bold">Panel Administrativo</h2>
           <p className="text-white/60">Control total de ingresos, logística e inventario.</p>
         </div>
         
-        <div className="flex bg-inboxa-dark p-1 rounded-lg border border-white/10">
+        <div className="flex bg-inboxa-dark p-1 rounded-lg border border-white/10 mx-auto lg:mx-0">
           <button 
             onClick={() => setActiveTab('finance')}
             className={cn(
@@ -138,76 +144,7 @@ export const AdminView: React.FC = () => {
           </div>
         </div>
       ) : (
-        <div className="card-glass p-8 flex flex-col gap-8">
-          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-            <div>
-              <h3 className="text-xl font-bold">Gestión de Inventario Dinámico</h3>
-              <p className="text-sm text-white/40">Sincronización bidireccional con Google Drive (Excel).</p>
-            </div>
-            <div className="flex gap-3 w-full md:w-auto">
-              <button className="flex-1 md:flex-none btn-primary flex items-center justify-center gap-2">
-                <Plus size={18} />
-                Nuevo Producto
-              </button>
-              <button className="flex-1 md:flex-none btn-primary bg-white/10 hover:bg-white/20 flex items-center justify-center gap-2">
-                <FileSpreadsheet size={18} />
-                Carga Drive
-              </button>
-            </div>
-          </div>
-
-          <div className="overflow-x-auto">
-            <table className="w-full text-left">
-              <thead>
-                <tr className="border-b border-white/10 text-xs font-bold uppercase tracking-widest text-white/40">
-                  <th className="pb-4 pt-2">Producto</th>
-                  <th className="pb-4 pt-2">SKU</th>
-                  <th className="pb-4 pt-2">Precio</th>
-                  <th className="pb-4 pt-2">Stock Actual</th>
-                  <th className="pb-4 pt-2">Status</th>
-                  <th className="pb-4 pt-2"></th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-white/5">
-                {[
-                  { name: 'Guantes Pro Red', sku: 'BOX-001', price: '$45.99', stock: 15, status: 'Normal' },
-                  { name: 'Pera Loca 2.0', sku: 'BOX-002', price: '$29.99', stock: 1, status: 'Bajo' },
-                  { name: 'Cabezal Foam', sku: 'BOX-003', price: '$55.00', stock: 24, status: 'Normal' },
-                ].map((item, idx) => (
-                  <tr key={idx} className="group hover:bg-white/5">
-                    <td className="py-4 font-medium">{item.name}</td>
-                    <td className="py-4 font-mono text-xs text-white/40">{item.sku}</td>
-                    <td className="py-4 font-bold text-inboxa-coral">{item.price}</td>
-                    <td className="py-4">
-                      <div className="flex items-center gap-2">
-                        <span className="font-bold">{item.stock}</span>
-                        <div className="w-20 h-1.5 bg-white/10 rounded-full overflow-hidden">
-                          <div 
-                            className={cn("h-full", item.stock < 10 ? "bg-inboxa-yellow" : "bg-green-500")} 
-                            style={{ width: `${Math.min(item.stock * 4, 100)}%` }}
-                          />
-                        </div>
-                      </div>
-                    </td>
-                    <td className="py-4">
-                      <span className={cn(
-                        "text-[10px] font-bold uppercase px-2 py-0.5 rounded",
-                        item.status === 'Bajo' ? "bg-inboxa-yellow/20 text-inboxa-yellow" : "bg-green-500/20 text-green-400"
-                      )}>
-                        {item.status}
-                      </span>
-                    </td>
-                    <td className="py-4 text-right">
-                      <button className="p-2 opacity-0 group-hover:opacity-100 transition-all text-white/40 hover:text-white">
-                        <RefreshCw size={16} />
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
+        <InventoryView userRole="admin" />
       )}
     </div>
   );

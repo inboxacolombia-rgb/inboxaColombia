@@ -50,7 +50,12 @@ export const WarehouseView: React.FC = () => {
 
   return (
     <div className="flex flex-col gap-6 p-4 lg:p-8 h-full">
-      <div className="flex flex-col gap-2">
+      <div className="flex flex-col gap-2 pt-10 lg:pt-0 text-center lg:text-left items-center lg:items-start">
+        <img 
+          src="/logo/logo%20inboxa.jpg" 
+          alt="INBOXA Logo" 
+          className="w-16 h-16 rounded-lg mb-2 lg:hidden shadow-lg border border-white/10"
+        />
         <h2 className="text-2xl font-display font-bold">Gestión de Bodega</h2>
         <p className="text-white/60">Lista de pedidos listos para empaque y despacho.</p>
       </div>
@@ -73,7 +78,7 @@ export const WarehouseView: React.FC = () => {
                 </div>
                 <div className={cn(
                   "px-3 py-1 rounded-full text-[10px] font-bold uppercase",
-                  order.status === 'Validado' ? "bg-blue-500/20 text-blue-400" : "bg-inboxa-yellow/20 text-inboxa-yellow"
+                  order.status === 'Validado' ? "bg-green-500/20 text-green-400" : "bg-inboxa-yellow/20 text-inboxa-yellow"
                 )}>
                   {order.status}
                 </div>

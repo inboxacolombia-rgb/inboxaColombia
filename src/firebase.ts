@@ -1,35 +1,28 @@
-import { initializeApp } from 'firebase/app';
+import { initializeApp, getApp, getApps } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
-import { getFirestore, doc, getDocFromServer } from 'firebase/firestore';
+import { getFirestore } from 'firebase/firestore';
+import config from './firebase-applet-config.json';
 
-let db: any;
-let auth: any;
-
-const initFirebase = async () => {
-  try {
-    // @ts-ignore
-    const firebaseConfig = await import('./firebase-applet-config.json');
-    
-    const app = initializeApp(firebaseConfig.default);
-    db = getFirestore(app, firebaseConfig.default.firestoreDatabaseId);
-    auth = getAuth(app);
-
-    const testConnection = async () => {
-      try {
-        await getDocFromServer(doc(db, 'test', 'connection'));
-        console.log("Firebase connected successfully");
-      } catch (error) {
-        if (error instanceof Error && error.message.includes('the client is offline')) {
-          console.error("Please check your Firebase configuration.");
-        }
-      }
-    };
-    testConnection();
-  } catch (e) {
-    console.warn("Firebase config not found. Please complete the setup in the UI.");
-  }
+// Default empty config to prevent crashes
+const fallbackConfig = {
+  apiKey: "demo-key",
+  authDomain: "demo.firebaseapp.com",
+  projectId: "demo-project",
+  storageBucket: "demo.appspot.com",
+  messagingSenderId: "000000000000",
+  appId: "0:000000000000:web:000000000000",
 };
 
-initFirebase();
+let app;
+const configWithType = config as any;
 
-export { db, auth };
+if (configWithType && configWithType.apiKey) {
+  app = initializeApp(configWithType);
+  console.log("Firebase initialized with project config");
+} else {
+  console.warn("Using demo Firebase configuration. Please set up Firebase in the UI.");
+  app = getApps().length === 0 ? initializeApp(fallbackConfig) : getApp();
+}
+
+export const auth = getAuth(app);
+export const db = getFirestore(app);

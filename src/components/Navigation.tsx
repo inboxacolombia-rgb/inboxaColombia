@@ -7,7 +7,8 @@ import {
   Settings, 
   LogOut,
   Menu,
-  X
+  X,
+  FileSpreadsheet
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '@/src/lib/utils';
@@ -36,6 +37,12 @@ export const Navigation: React.FC<NavigationProps> = ({ role, onLogout }) => {
       roles: ['warehouse', 'admin']
     },
     {
+      label: 'Inventario',
+      path: '/inventory',
+      icon: FileSpreadsheet,
+      roles: ['seller', 'warehouse', 'admin']
+    },
+    {
       label: 'Dashboard',
       path: '/admin',
       icon: BarChart3,
@@ -55,7 +62,7 @@ export const Navigation: React.FC<NavigationProps> = ({ role, onLogout }) => {
       <button 
         id="mobile-nav-toggle"
         onClick={() => setIsOpen(!isOpen)}
-        className="lg:hidden fixed top-4 right-4 z-50 p-2 bg-inboxa-coral rounded-lg shadow-lg"
+        className="lg:hidden fixed top-4 left-4 z-50 p-2 bg-inboxa-coral rounded-lg shadow-lg"
       >
         {isOpen ? <X size={24} /> : <Menu size={24} />}
       </button>
@@ -66,7 +73,7 @@ export const Navigation: React.FC<NavigationProps> = ({ role, onLogout }) => {
         isOpen ? "translate-x-0" : "-translate-x-full"
       )}>
         <div className="flex flex-col h-full p-6">
-          <div className="mb-10">
+          <div className="mb-10 flex flex-col items-center text-center">
             <img 
               src="/logo/logo%20inboxa.jpg" 
               alt="INBOXA COL Logo" 
