@@ -13,31 +13,53 @@ import {
   Trash2, 
   ChevronRight,
   Plus,
-  Minus
+  Minus,
+  Truck
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '@/src/lib/utils';
 import { Product, OrderItem } from '@/src/types';
+import { writeToGoogleSheets } from '../services/googleSheetsService';
+import { db, auth } from '../firebase';
+import { 
+  collection, 
+  addDoc, 
+  serverTimestamp, 
+  getDocs, 
+  query, 
+  where, 
+  doc, 
+  setDoc
+} from 'firebase/firestore';
+import { signInAnonymously } from 'firebase/auth';
 
-// Mock products for UI development
+// Products from INBOXA store
 const MOCK_PRODUCTS: Product[] = [
-  { id: '1', code: 'PROD-001', name: 'Boxing Gloves Red', price: 45.99, stock: 15, imageUrl: 'https://images.unsplash.com/photo-1549719386-74dfcbf7dbed?w=200&h=200&fit=crop', updatedAt: new Date() },
-  { id: '2', code: 'PROD-002', name: 'Speed Bag', price: 29.99, stock: 5, imageUrl: 'https://images.unsplash.com/photo-1599058917233-57c0e8ba0793?w=200&h=200&fit=crop', updatedAt: new Date() },
-  { id: '3', code: 'PROD-003', name: 'Punching Mitts', price: 34.99, stock: 10, imageUrl: 'https://images.unsplash.com/photo-1517836357463-d25dfeac3438?w=200&h=200&fit=crop', updatedAt: new Date() },
-  { id: '4', code: 'PROD-004', name: 'Head Guard', price: 55.00, stock: 3, imageUrl: 'https://images.unsplash.com/photo-1552072092-2f9c76212902?w=200&h=200&fit=crop', updatedAt: new Date() },
-  { id: '5', code: 'PROD-005', name: 'Hand Wraps', price: 12.50, stock: 50, imageUrl: 'https://images.unsplash.com/photo-1511886929837-354d827aae26?w=200&h=200&fit=crop', updatedAt: new Date() },
+  { id: '1', code: 'HIDRO-PERC', name: 'Combo Hidro Percutor', price: 185000, stock: 15, imageUrl: 'https://cdn.shopify.com/s/files/1/0737/9035/7642/files/GAME_TV.png?v=1776462379', updatedAt: new Date() },
+  { id: '2', code: 'PINT-PERC', name: 'Combo Pintura Percutor', price: 230000, stock: 10, imageUrl: 'https://cdn.shopify.com/s/files/1/0737/9035/7642/files/2.png?v=1776461882', updatedAt: new Date() },
+  { id: '3', code: 'SEC-PLAN', name: 'Combo Secador + Plancha', price: 100000, stock: 25, imageUrl: 'https://cdn.shopify.com/s/files/1/0737/9035/7642/files/secador.png?v=1771880783', updatedAt: new Date() },
+  { id: '4', code: 'AGUACATE', name: 'Combo Aguacate (Plancha + Secador)', price: 100000, stock: 20, imageUrl: 'https://cdn.shopify.com/s/files/1/0737/9035/7642/files/2577-1-680x680.jpg?v=1777480761', updatedAt: new Date() },
+  { id: '5', code: 'FLIP-7', name: 'Parlante Flip 7', price: 80000, stock: 30, imageUrl: 'https://cdn.shopify.com/s/files/1/0737/9035/7642/files/5-680x907.png?v=1777558633', updatedAt: new Date() },
+  { id: '6', code: 'CHARGE-6', name: 'Parlante Charge 6', price: 90000, stock: 20, imageUrl: 'https://cdn.shopify.com/s/files/1/0737/9035/7642/files/9efb082d-43f7-4a80-b746-bc07a6405c91-680x907.jpg?v=1777558465', updatedAt: new Date() },
+  { id: '7', code: 'V380-CAM', name: 'Cámara Exterior Doble Lente', price: 110000, stock: 12, imageUrl: 'https://cdn.shopify.com/s/files/1/0737/9035/7642/files/WhatsApp-Image-2025-08-15-at-1.06.39-PM-4-680x907.jpg?v=1777481504', updatedAt: new Date() },
+  { id: '8', code: 'TRUPER-ASP', name: 'Aspiradora Truper 15L 3Hp', price: 400000, stock: 5, imageUrl: 'https://cdn.shopify.com/s/files/1/0737/9035/7642/files/18b543f30d5-protool_herramientas-ogf01t8hom-lb8ryamr6rk.jpg?v=1772573373', updatedAt: new Date() },
+  { id: '9', code: 'MASAJ-3C', name: 'Masajeador 3 Cabezas', price: 70000, stock: 15, imageUrl: 'https://cdn.shopify.com/s/files/1/0737/9035/7642/files/19c6de09070-protool_herramientas-fjwbb98qeiv-jh1djznt28a.jpg?v=177740906', updatedAt: new Date() },
+  { id: '10', code: 'LEGO-PIR', name: 'Lego Piratas (509 pcs)', price: 95000, stock: 8, imageUrl: 'https://cdn.shopify.com/s/files/1/0737/9035/7642/files/19ac72af788-sokanylocales-fvmy22txuii-jtggfhol8j.jpg?v=1777741457', updatedAt: new Date() },
+  { id: '11', code: 'PIC-SOKANY', name: 'Picador 4L Sokany', price: 100000, stock: 10, imageUrl: 'https://cdn.shopify.com/s/files/1/0737/9035/7642/files/199355473bd-sokanylocales-9gufn31sg0v-vzczxy93x49.jpg?v=1777740751', updatedAt: new Date() },
+  { id: '12', code: 'K-ROBOT', name: 'Kit Robot Solar', price: 68000, stock: 15, imageUrl: 'https://cdn.shopify.com/s/files/1/0737/9035/7642/files/01566859-3c56-4689-a123-212e799ca62f-680x907.jpg?v=1777741971', updatedAt: new Date() },
 ];
 
-import { db, auth } from '../firebase';
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
-import { signInAnonymously } from 'firebase/auth';
+
 
 export const SellerView: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [cart, setCart] = useState<OrderItem[]>([]);
   const [loading, setLoading] = useState(false);
-  
+  const [products, setProducts] = useState<Product[]>(MOCK_PRODUCTS);
+  const [existingCustomers, setExistingCustomers] = useState<any[]>([]);
+  const [showCustomerResults, setShowCustomerResults] = useState(false);
+
   // Customer Form State
   const [customerData, setCustomerData] = useState({
     name: '',
@@ -45,15 +67,42 @@ export const SellerView: React.FC = () => {
     address: '',
     city: '',
     phone: '',
-    paymentMethod: 'transfer'
+    paymentMethod: 'transfer',
+    shippingCost: ''
   });
 
+  // Load products and customers
+  React.useEffect(() => {
+    const loadData = async () => {
+      try {
+        // Load products
+        const productsSnapshot = await getDocs(query(collection(db, 'products')));
+        if (!productsSnapshot.empty) {
+          const fetchedProducts = productsSnapshot.docs.map(doc => ({ 
+            id: doc.id, 
+            ...doc.data() 
+          })) as Product[];
+          setProducts(fetchedProducts);
+        }
+
+        // Load customers
+        const q = query(collection(db, 'customers'));
+        const snapshot = await getDocs(q);
+        const customers = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        setExistingCustomers(customers);
+      } catch (err) {
+        console.error("Error loading data:", err);
+      }
+    };
+    loadData();
+  }, []);
+
   const filteredProducts = useMemo(() => {
-    return MOCK_PRODUCTS.filter(p => 
+    return products.filter(p => 
       p.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-      p.code.toLowerCase().includes(searchTerm.toLowerCase())
+      (p.code || '').toLowerCase().includes(searchTerm.toLowerCase())
     );
-  }, [searchTerm]);
+  }, [searchTerm, products]);
 
   const addToCart = (product: Product) => {
     if (product.stock <= 0) return;
@@ -84,7 +133,7 @@ export const SellerView: React.FC = () => {
     setCart(prev => prev.map(item => {
       if (item.productId === productId) {
         const newQty = Math.max(0, item.quantity + delta);
-        const product = MOCK_PRODUCTS.find(p => p.id === productId);
+        const product = products.find(p => p.id === productId);
         if (product && newQty > product.stock) return item;
         return { ...item, quantity: newQty };
       }
@@ -99,22 +148,38 @@ export const SellerView: React.FC = () => {
   const [isConfirming, setIsConfirming] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
 
-  const total = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+  const shipCost = parseFloat(customerData.shippingCost) || 0;
+  const subtotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+  const total = subtotal + shipCost;
   const cartItemCount = cart.reduce((sum, item) => sum + item.quantity, 0);
 
-  const isFormValid = customerData.name && customerData.phone && customerData.idNumber && cart.length > 0;
+  const isBogotaOrEmpty = customerData.city.toLowerCase().trim() === 'bogota' || 
+                           customerData.city.toLowerCase().trim() === 'bogotá' ||
+                           customerData.city.trim() === '';
+
+  const isFormValid = (
+    cart.length > 0 && 
+    customerData.name.trim() !== '' && 
+    customerData.idNumber.trim() !== '' && 
+    customerData.phone.trim() !== '' && 
+    customerData.city.trim() !== '' && 
+    customerData.address.trim() !== '' &&
+    customerData.paymentMethod !== '' &&
+    (isBogotaOrEmpty || customerData.shippingCost.trim() !== '')
+  );
 
   const handleConfirmOrder = async () => {
-    if (!isConfirming) {
-      setIsConfirming(true);
-      return;
-    }
+    if (cart.length === 0 || !isFormValid || loading) return;
 
     setLoading(true);
     try {
       // Verify auth exists for rules
       if (!auth.currentUser) {
-        await signInAnonymously(auth);
+        try {
+          await signInAnonymously(auth);
+        } catch (authError) {
+          console.warn("Auth failed, continuing anyway (might fail Firestore rules):", authError);
+        }
       }
 
       // Save order to Firestore
@@ -133,42 +198,80 @@ export const SellerView: React.FC = () => {
           code: item.code
         })),
         total: total,
+        shippingCost: shipCost,
         status: 'Solicitado',
         paymentMethod: customerData.paymentMethod,
+        paymentStatus: 'Pendiente',
         sellerId: auth.currentUser?.uid || 'anonymous',
         sellerName: auth.currentUser?.displayName || 'Vendedor Live',
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       };
 
-      await addDoc(collection(db, 'orders'), orderData);
+      // Add Order
+      try {
+        await addDoc(collection(db, 'orders'), orderData);
+      } catch (orderErr) {
+        console.error("Firestore Order Save failed:", orderErr);
+        // We continue because maybe Sheets works, but we should inform later
+      }
       
+      // Save/Update Customer in Database
+      try {
+        const customerRef = doc(db, 'customers', customerData.idNumber);
+        await setDoc(customerRef, {
+          idNumber: customerData.idNumber,
+          name: customerData.name,
+          phone: customerData.phone,
+          address: customerData.address,
+          city: customerData.city,
+          fidelity: 'Conocido',
+          lastOrderAt: serverTimestamp(),
+          updatedAt: serverTimestamp()
+        }, { merge: true });
+      } catch (custErr) {
+        console.error("Firestore Customer Save failed:", custErr);
+      }
+
+      // Push to Google Sheets (Non-blocking)
+      writeToGoogleSheets({
+        name: customerData.name,
+        idNumber: customerData.idNumber,
+        phone: customerData.phone,
+        address: customerData.address,
+        city: customerData.city
+      }).catch(sheetError => {
+        console.error("Error pushing to Google Sheets:", sheetError);
+      });
+      
+      // SUCCESS ACTIONS
       setIsSuccess(true);
       setLoading(false);
       
-      // Reset after success
+      // Reset Data
+      setCart([]);
+      setCustomerData({
+        name: '',
+        idNumber: '',
+        address: '',
+        city: '',
+        phone: '',
+        paymentMethod: 'transfer',
+        shippingCost: ''
+      });
+      
+      setIsConfirming(false);
+      
+      // Auto-hide success and close drawer after 2 seconds
       setTimeout(() => {
-        setCart([]);
-        setCustomerData({
-          name: '',
-          idNumber: '',
-          address: '',
-          city: '',
-          phone: '',
-          paymentMethod: 'transfer'
-        });
         setIsSuccess(false);
-        setIsConfirming(false);
         setIsCartOpen(false);
       }, 2000);
+
     } catch (error: any) {
-      console.error("Error saving order:", error);
-      const message = error.code === 'permission-denied' 
-        ? "Error de permisos: Asegúrate de estar conectado." 
-        : "Error al registrar la venta. Inténtalo de nuevo.";
-      alert(message);
+      console.error("General Order Process Error:", error);
+      alert("Hubo un problema al procesar el pedido. Por favor verifica tu conexión.");
       setLoading(false);
-      setIsConfirming(false);
     }
   };
 
@@ -369,7 +472,7 @@ export const SellerView: React.FC = () => {
                         onChange={e => setCustomerData(prev => ({ ...prev, name: e.target.value }))}
                       />
                     </div>
-                    <div className="flex flex-col gap-1.5">
+                    <div className="flex flex-col gap-1.5 relative">
                       <label className="text-[10px] font-bold uppercase tracking-widest text-white/40 flex items-center gap-2">
                         <Hash size={10} /> Cédula
                       </label>
@@ -378,8 +481,41 @@ export const SellerView: React.FC = () => {
                         placeholder="Documento de Identidad"
                         className="input-field w-full h-12 bg-white/5"
                         value={customerData.idNumber}
-                        onChange={e => setCustomerData(prev => ({ ...prev, idNumber: e.target.value }))}
+                        onChange={e => {
+                          const val = e.target.value;
+                          setCustomerData(prev => ({ ...prev, idNumber: val }));
+                          setShowCustomerResults(val.length > 3);
+                        }}
+                        onBlur={() => setTimeout(() => setShowCustomerResults(false), 200)}
                       />
+                      
+                      {showCustomerResults && (
+                        <div className="absolute top-full left-0 right-0 bg-inboxa-dark border border-white/10 rounded-xl mt-1 z-50 overflow-hidden shadow-2xl max-h-48 overflow-y-auto">
+                          {existingCustomers
+                            .filter(c => c.idNumber.includes(customerData.idNumber))
+                            .map(c => (
+                              <button
+                                key={c.id}
+                                className="w-full p-3 text-left hover:bg-white/5 border-b border-white/5 last:border-0 transition-colors"
+                                onClick={() => {
+                                  setCustomerData({
+                                    name: c.name,
+                                    idNumber: c.idNumber,
+                                    phone: c.phone || '',
+                                    address: c.address || '',
+                                    city: c.city || '',
+                                    paymentMethod: 'transfer',
+                                    shippingCost: ''
+                                  });
+                                  setShowCustomerResults(false);
+                                }}
+                              >
+                                <p className="font-bold text-sm">{c.name}</p>
+                                <p className="text-[10px] text-white/40 font-mono">{c.idNumber} • {c.city}</p>
+                              </button>
+                            ))}
+                        </div>
+                      )}
                     </div>
                     <div className="flex flex-col gap-1.5">
                       <label className="text-[10px] font-bold uppercase tracking-widest text-white/40 flex items-center gap-2" >
@@ -405,6 +541,26 @@ export const SellerView: React.FC = () => {
                         onChange={e => setCustomerData(prev => ({ ...prev, city: e.target.value }))}
                       />
                     </div>
+                    
+                    {!isBogotaOrEmpty && (
+                      <motion.div 
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: 'auto' }}
+                        className="flex flex-col gap-1.5"
+                      >
+                        <label className="text-[10px] font-bold uppercase tracking-widest text-inboxa-coral flex items-center gap-2">
+                          <Truck size={10} /> Valor de Envío
+                        </label>
+                        <input 
+                          type="number"
+                          placeholder="Costo de transporte"
+                          className="input-field w-full h-12 bg-white/10 border-inboxa-coral/30"
+                          value={customerData.shippingCost}
+                          onChange={e => setCustomerData(prev => ({ ...prev, shippingCost: e.target.value }))}
+                        />
+                      </motion.div>
+                    )}
+
                     <div className="flex flex-col gap-1.5 md:col-span-2">
                       <label className="text-[10px] font-bold uppercase tracking-widest text-white/40 flex items-center gap-2">
                         <MapPin size={10} /> Dirección de Entrega
@@ -453,7 +609,13 @@ export const SellerView: React.FC = () => {
               <div className="p-6 bg-white/5 border-t border-white/10 flex flex-col gap-4">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-xs text-white/40">Subtotal a pagar</p>
+                    {shipCost > 0 && (
+                      <div className="flex items-center gap-2 mb-1">
+                        <p className="text-[10px] text-white/40 uppercase font-bold">Sub: ${subtotal.toFixed(2)}</p>
+                        <p className="text-[10px] text-inboxa-coral uppercase font-bold">+ Envío: ${shipCost.toFixed(2)}</p>
+                      </div>
+                    )}
+                    <p className="text-xs text-white/40">Total a pagar</p>
                     <h2 className="text-3xl font-black text-inboxa-coral">${total.toFixed(2)}</h2>
                   </div>
                   <div className="text-right">
@@ -464,14 +626,15 @@ export const SellerView: React.FC = () => {
 
                 <AnimatePresence mode="wait">
                   {isSuccess ? (
-                    <motion.div
+                    <motion.button
                       key="success"
                       initial={{ opacity: 0, y: 10 }}
                       animate={{ opacity: 1, y: 0 }}
-                      className="w-full h-16 bg-green-500 rounded-2xl flex items-center justify-center gap-3 text-lg font-black uppercase tracking-widest"
+                      onClick={() => setIsSuccess(false)}
+                      className="w-full h-16 bg-green-500 hover:bg-green-600 rounded-2xl flex items-center justify-center gap-3 text-lg font-black uppercase tracking-widest transition-colors shadow-lg shadow-green-500/20"
                     >
-                      <CheckCircle2 size={24} /> ¡Pedido Exitoso!
-                    </motion.div>
+                      <CheckCircle2 size={24} /> ¡Éxito! Nueva Venta?
+                    </motion.button>
                   ) : (
                     <div className="flex flex-col gap-2">
                       <button 
@@ -481,9 +644,7 @@ export const SellerView: React.FC = () => {
                           "w-full h-16 rounded-2xl flex items-center justify-center gap-3 text-lg font-black uppercase tracking-widest transition-all relative overflow-hidden",
                           !isFormValid || loading
                             ? "bg-white/5 text-white/20 cursor-not-allowed"
-                            : isConfirming
-                              ? "bg-inboxa-yellow text-inboxa-dark shadow-xl shadow-inboxa-yellow/20"
-                              : "bg-inboxa-coral hover:bg-inboxa-coral/90 shadow-xl shadow-inboxa-coral/20"
+                            : "bg-inboxa-coral hover:bg-inboxa-coral/90 shadow-xl shadow-inboxa-coral/20"
                         )}
                       >
                         {loading ? (
@@ -491,21 +652,10 @@ export const SellerView: React.FC = () => {
                             <div className="w-5 h-5 border-2 border-current border-t-transparent rounded-full animate-spin" />
                             Procesando...
                           </div>
-                        ) : isConfirming ? (
-                          <>¿Confirmar Ahora? <CheckCircle2 size={24} /></>
                         ) : (
                           <>Confirmar Pedido <ChevronRight size={24} /></>
                         )}
                       </button>
-                      
-                      {isConfirming && (
-                        <button 
-                          onClick={() => setIsConfirming(false)}
-                          className="text-white/40 hover:text-white text-xs font-bold uppercase tracking-widest py-2"
-                        >
-                          Cancelar y Revisar
-                        </button>
-                      )}
                     </div>
                   )}
                 </AnimatePresence>

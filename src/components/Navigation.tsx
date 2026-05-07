@@ -8,7 +8,8 @@ import {
   LogOut,
   Menu,
   X,
-  FileSpreadsheet
+  FileSpreadsheet,
+  ClipboardList
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '@/src/lib/utils';
@@ -28,6 +29,12 @@ export const Navigation: React.FC<NavigationProps> = ({ role, onLogout }) => {
       label: 'Ventas Live',
       path: '/seller',
       icon: ShoppingCart,
+      roles: ['seller', 'admin']
+    },
+    {
+      label: 'Mis Pedidos',
+      path: '/seller-orders',
+      icon: ClipboardList,
       roles: ['seller', 'admin']
     },
     {

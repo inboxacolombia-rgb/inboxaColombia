@@ -45,6 +45,21 @@
         "paidAt": { "type": "string", "format": "date-time" }
       },
       "required": ["customerPhone", "items", "total", "status", "sellerId", "createdAt"]
+    },
+    "Customer": {
+      "title": "Customer",
+      "description": "Customer contact information and history",
+      "type": "object",
+      "properties": {
+        "idNumber": { "type": "string" },
+        "name": { "type": "string" },
+        "phone": { "type": "string" },
+        "address": { "type": "string" },
+        "city": { "type": "string" },
+        "fidelity": { "type": "string" },
+        "lastOrderAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["idNumber", "name", "phone"]
     }
   },
   "firestore": {
@@ -59,6 +74,10 @@
     "orders": {
       "schema": "Order",
       "description": "Order records for sales and logistics tracking"
+    },
+    "customers": {
+      "schema": "Customer",
+      "description": "Customer database for quick lookup and history"
     }
   }
 }

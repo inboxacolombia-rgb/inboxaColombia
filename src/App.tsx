@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import { SellerView } from './views/SellerView';
+import { SellerOrdersView } from './views/SellerOrdersView';
 import { WarehouseView } from './views/WarehouseView';
 import { AdminView } from './views/AdminView';
 import { SettingsView } from './views/SettingsView';
@@ -54,6 +55,11 @@ function AppRouter() {
           <Route 
             path="seller" 
             element={activeUser.role === 'seller' || activeUser.role === 'admin' ? <SellerView /> : <Navigate to="/" />} 
+          />
+          
+          <Route 
+            path="seller-orders" 
+            element={activeUser.role === 'seller' || activeUser.role === 'admin' ? <SellerOrdersView /> : <Navigate to="/" />} 
           />
           
           <Route 

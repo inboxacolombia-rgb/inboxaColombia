@@ -3,43 +3,8 @@ import { Package, Truck, ClipboardList, User, MapPin } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '@/src/lib/utils';
 import { Order, OrderStatus } from '@/src/types';
-
-// Mock orders for Warehouse development
-const MOCK_ORDERS: Order[] = [
-  { 
-    id: 'ORD-101', 
-    customerPhone: '3101234567', 
-    customerName: 'Camilo Rodriguez',
-    customerFidelity: 'Amigo Especial',
-    items: [
-      { productId: '1', code: 'PROD-001', name: 'Boxing Gloves Red', price: 0, quantity: 2 },
-      { productId: '2', code: 'PROD-002', name: 'Speed Bag', price: 0, quantity: 1 }
-    ],
-    total: 0, // Hidden in Warehouse
-    status: 'Validado',
-    sellerId: 'user1',
-    createdAt: new Date(),
-    updatedAt: new Date()
-  },
-  { 
-    id: 'ORD-102', 
-    customerPhone: '3209876543', 
-    customerName: 'Maria Garcia',
-    customerFidelity: 'Nuevo',
-    items: [
-      { productId: '3', code: 'PROD-003', name: 'Punching Mitts', price: 0, quantity: 1 }
-    ],
-    total: 0,
-    status: 'En Preparación',
-    sellerId: 'user1',
-    createdAt: new Date(),
-    updatedAt: new Date()
-  }
-];
-
 import { db, auth } from '../firebase';
 import { collection, onSnapshot, query, orderBy, doc, updateDoc, serverTimestamp } from 'firebase/firestore';
-import { signInAnonymously } from 'firebase/auth';
 import { Bell, Hash, CreditCard, Building2, CheckCircle2, X } from 'lucide-react';
 
 export const WarehouseView: React.FC = () => {
@@ -48,17 +13,7 @@ export const WarehouseView: React.FC = () => {
   const [newOrderAlert, setNewOrderAlert] = useState<Order | null>(null);
 
   React.useEffect(() => {
-    const initAuth = async () => {
-      if (!auth.currentUser) {
-        try {
-          await signInAnonymously(auth);
-        } catch (e) {
-          console.error("Auth error in Warehouse", e);
-        }
-      }
-    };
-    initAuth();
-
+    // Escuchar pedidos en tiempo real
     const q = query(collection(db, 'orders'), orderBy('createdAt', 'desc'));
     
     const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -67,22 +22,15 @@ export const WarehouseView: React.FC = () => {
         ...doc.data()
       })) as Order[];
       
-      // Check for new orders to show alert (if it's not the first load)
-      if (!loading && ordersData.length > orders.length) {
-        const newest = ordersData[0];
-        if (newest.status === 'Solicitado') {
-          setNewOrderAlert(newest);
-          // Auto-hide alert after 5 seconds
-          setTimeout(() => setNewOrderAlert(null), 8000);
-        }
-      }
-      
       setOrders(ordersData);
+      setLoading(false);
+    }, (error) => {
+      console.error("Warehouse listener error:", error);
       setLoading(false);
     });
 
     return () => unsubscribe();
-  }, [loading, orders.length]);
+  }, []); // Sin dependencias para que sea estable
 
   const updateStatus = async (orderId: string, currentStatus: OrderStatus) => {
     let nextStatus: OrderStatus = currentStatus;

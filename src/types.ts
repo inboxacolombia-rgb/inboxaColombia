@@ -41,6 +41,17 @@ export interface OrderItem {
   quantity: number;
 }
 
+export interface Customer {
+  id: string;
+  idNumber: string;
+  name: string;
+  phone: string;
+  address: string;
+  city: string;
+  fidelity: CustomerFidelity;
+  lastOrderAt: any;
+}
+
 export interface Order {
   id: string;
   customerPhone: string;
@@ -51,12 +62,14 @@ export interface Order {
   customerFidelity: CustomerFidelity;
   items: OrderItem[];
   total: number;
+  shippingCost?: number;
   status: OrderStatus;
   paymentMethod: string;
+  paymentStatus: 'Pendiente' | 'Pagado' | 'Rechazado';
+  paidAt?: any;
   sellerId: string;
   sellerName?: string;
   trackingNumber?: string;
   createdAt: any;
   updatedAt: any;
-  paidAt?: any;
 }
