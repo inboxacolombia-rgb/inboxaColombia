@@ -3,6 +3,8 @@ import { ShoppingCart, Package, ShieldCheck } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { UserRole } from '../types';
 import { cn } from '../lib/utils';
+import { auth } from '../firebase';
+import { signInAnonymously } from 'firebase/auth';
 
 interface LoginViewProps {
   onLogin: (role: UserRole) => void;
@@ -36,15 +38,23 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLogin }) => {
     }
   ];
 
-  const handleRoleSelect = (role: UserRole) => {
+  const handleRoleSelect = async (role: UserRole) => {
     setLoading(true);
     setSelectedRole(role);
     
-    // Simulate a brief loading state for better UX
-    setTimeout(() => {
-      setLoading(false);
+    try {
+      // Ensure we have a firebase session for rules to work
+      if (!auth.currentUser) {
+        await signInAnonymously(auth);
+      }
       onLogin(role);
-    }, 800);
+    } catch (error) {
+      console.error("Firebase Auth Error:", error);
+      // Fallback for demo: continue even if auth fails, but warn
+      onLogin(role);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (

@@ -28,10 +28,15 @@ const MOCK_PRODUCTS: Product[] = [
   { id: '5', code: 'PROD-005', name: 'Hand Wraps', price: 12.50, stock: 50, imageUrl: 'https://images.unsplash.com/photo-1511886929837-354d827aae26?w=200&h=200&fit=crop', updatedAt: new Date() },
 ];
 
+import { db, auth } from '../firebase';
+import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { signInAnonymously } from 'firebase/auth';
+
 export const SellerView: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [cart, setCart] = useState<OrderItem[]>([]);
+  const [loading, setLoading] = useState(false);
   
   // Customer Form State
   const [customerData, setCustomerData] = useState({
@@ -91,21 +96,92 @@ export const SellerView: React.FC = () => {
     setCart(prev => prev.filter(item => item.productId !== productId));
   };
 
+  const [isConfirming, setIsConfirming] = useState(false);
+  const [isSuccess, setIsSuccess] = useState(false);
+
   const total = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
   const cartItemCount = cart.reduce((sum, item) => sum + item.quantity, 0);
 
   const isFormValid = customerData.name && customerData.phone && customerData.idNumber && cart.length > 0;
+
+  const handleConfirmOrder = async () => {
+    if (!isConfirming) {
+      setIsConfirming(true);
+      return;
+    }
+
+    setLoading(true);
+    try {
+      // Verify auth exists for rules
+      if (!auth.currentUser) {
+        await signInAnonymously(auth);
+      }
+
+      // Save order to Firestore
+      const orderData = {
+        customerName: customerData.name || 'Sin Nombre',
+        customerPhone: customerData.phone || '0',
+        customerIdNumber: customerData.idNumber || '0',
+        customerAddress: customerData.address || 'Sin Dirección',
+        customerCity: customerData.city || 'Sin Ciudad',
+        customerFidelity: 'Nuevo',
+        items: cart.map(item => ({
+          productId: item.productId,
+          name: item.name,
+          price: item.price,
+          quantity: item.quantity,
+          code: item.code
+        })),
+        total: total,
+        status: 'Solicitado',
+        paymentMethod: customerData.paymentMethod,
+        sellerId: auth.currentUser?.uid || 'anonymous',
+        sellerName: auth.currentUser?.displayName || 'Vendedor Live',
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      };
+
+      await addDoc(collection(db, 'orders'), orderData);
+      
+      setIsSuccess(true);
+      setLoading(false);
+      
+      // Reset after success
+      setTimeout(() => {
+        setCart([]);
+        setCustomerData({
+          name: '',
+          idNumber: '',
+          address: '',
+          city: '',
+          phone: '',
+          paymentMethod: 'transfer'
+        });
+        setIsSuccess(false);
+        setIsConfirming(false);
+        setIsCartOpen(false);
+      }, 2000);
+    } catch (error: any) {
+      console.error("Error saving order:", error);
+      const message = error.code === 'permission-denied' 
+        ? "Error de permisos: Asegúrate de estar conectado." 
+        : "Error al registrar la venta. Inténtalo de nuevo.";
+      alert(message);
+      setLoading(false);
+      setIsConfirming(false);
+    }
+  };
 
   return (
     <div className="relative h-screen flex flex-col bg-inboxa-gray overflow-hidden">
       {/* Main Content */}
       <div className="flex-1 flex flex-col gap-6 p-4 lg:p-8 overflow-y-auto">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pt-10 lg:pt-0">
-          <div className="text-center lg:text-left flex flex-col items-center lg:items-start">
+          <div className="flex flex-col items-center lg:items-start text-center lg:text-left">
             <img 
               src="/logo/logo%20inboxa.jpg" 
               alt="INBOXA Logo" 
-              className="w-16 h-16 rounded-lg mb-2 lg:hidden shadow-lg border border-white/10"
+              className="w-24 h-auto max-h-24 object-contain rounded-xl mb-4 lg:hidden shadow-lg border border-white/10"
             />
             <h2 className="text-2xl font-display font-bold">Venta Fast-Track</h2>
             <p className="text-white/60">Busca y agrega productos rápidamente durante el Live.</p>
@@ -386,17 +462,53 @@ export const SellerView: React.FC = () => {
                   </div>
                 </div>
 
-                <button 
-                  disabled={!isFormValid}
-                  className={cn(
-                    "w-full h-16 rounded-2xl flex items-center justify-center gap-3 text-lg font-black uppercase tracking-widest transition-all",
-                    isFormValid 
-                      ? "bg-inboxa-coral hover:bg-inboxa-coral/90 shadow-xl shadow-inboxa-coral/20" 
-                      : "bg-white/5 text-white/20 cursor-not-allowed"
+                <AnimatePresence mode="wait">
+                  {isSuccess ? (
+                    <motion.div
+                      key="success"
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="w-full h-16 bg-green-500 rounded-2xl flex items-center justify-center gap-3 text-lg font-black uppercase tracking-widest"
+                    >
+                      <CheckCircle2 size={24} /> ¡Pedido Exitoso!
+                    </motion.div>
+                  ) : (
+                    <div className="flex flex-col gap-2">
+                      <button 
+                        onClick={handleConfirmOrder}
+                        disabled={!isFormValid || loading}
+                        className={cn(
+                          "w-full h-16 rounded-2xl flex items-center justify-center gap-3 text-lg font-black uppercase tracking-widest transition-all relative overflow-hidden",
+                          !isFormValid || loading
+                            ? "bg-white/5 text-white/20 cursor-not-allowed"
+                            : isConfirming
+                              ? "bg-inboxa-yellow text-inboxa-dark shadow-xl shadow-inboxa-yellow/20"
+                              : "bg-inboxa-coral hover:bg-inboxa-coral/90 shadow-xl shadow-inboxa-coral/20"
+                        )}
+                      >
+                        {loading ? (
+                          <div className="flex items-center gap-2">
+                            <div className="w-5 h-5 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                            Procesando...
+                          </div>
+                        ) : isConfirming ? (
+                          <>¿Confirmar Ahora? <CheckCircle2 size={24} /></>
+                        ) : (
+                          <>Confirmar Pedido <ChevronRight size={24} /></>
+                        )}
+                      </button>
+                      
+                      {isConfirming && (
+                        <button 
+                          onClick={() => setIsConfirming(false)}
+                          className="text-white/40 hover:text-white text-xs font-bold uppercase tracking-widest py-2"
+                        >
+                          Cancelar y Revisar
+                        </button>
+                      )}
+                    </div>
                   )}
-                >
-                  Confirmar Pedido <ChevronRight size={24} />
-                </button>
+                </AnimatePresence>
               </div>
             </motion.div>
           </>

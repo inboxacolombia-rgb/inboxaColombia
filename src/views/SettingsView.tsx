@@ -5,11 +5,11 @@ import { motion } from 'motion/react';
 export const SettingsView: React.FC = () => {
   return (
     <div className="flex flex-col gap-8 p-4 lg:p-8 h-full">
-      <div className="pt-10 lg:pt-0 text-center lg:text-left flex flex-col items-center lg:items-start">
+      <div className="pt-10 lg:pt-0 flex flex-col items-center lg:items-start text-center lg:text-left">
         <img 
           src="/logo/logo%20inboxa.jpg" 
           alt="INBOXA Logo" 
-          className="w-20 h-20 rounded-xl mb-4 lg:hidden shadow-lg border border-white/10"
+          className="w-28 h-auto max-h-28 object-contain rounded-xl mb-4 lg:hidden shadow-lg border border-white/10"
         />
         <h2 className="text-3xl font-display font-bold">Ajustes del Sistema</h2>
         <p className="text-white/60">Configuración de integraciones y seguridad.</p>

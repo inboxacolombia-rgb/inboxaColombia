@@ -19,11 +19,11 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ userRole = 'admin'
   return (
     <div className="flex flex-col gap-6 p-4 lg:p-8 h-full">
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pt-10 lg:pt-0">
-        <div className="text-center lg:text-left flex flex-col items-center lg:items-start">
+        <div className="flex flex-col items-center lg:items-start text-center lg:text-left">
           <img 
             src="/logo/logo%20inboxa.jpg" 
             alt="INBOXA Logo" 
-            className="w-20 h-20 rounded-xl mb-4 lg:hidden shadow-lg border border-white/10"
+            className="w-28 h-auto max-h-28 object-contain rounded-xl mb-4 lg:hidden shadow-lg border border-white/10"
           />
           <h2 className="text-3xl font-display font-bold">Control de Inventario</h2>
           <p className="text-white/60">Consulta de stock y catálogo de productos en tiempo real.</p>

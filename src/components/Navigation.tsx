@@ -77,7 +77,7 @@ export const Navigation: React.FC<NavigationProps> = ({ role, onLogout }) => {
             <img 
               src="/logo/logo%20inboxa.jpg" 
               alt="INBOXA COL Logo" 
-              className="h-12 w-auto mb-2"
+              className="w-32 h-auto max-h-32 object-contain rounded-2xl mb-4 shadow-xl border-2 border-white/10"
               referrerPolicy="no-referrer"
             />
             <p className="text-xs text-white/40 uppercase tracking-widest">Live-Commerce Hub</p>

@@ -44,11 +44,15 @@ export interface OrderItem {
 export interface Order {
   id: string;
   customerPhone: string;
-  customerName?: string;
+  customerName: string;
+  customerIdNumber: string;
+  customerAddress: string;
+  customerCity: string;
   customerFidelity: CustomerFidelity;
   items: OrderItem[];
   total: number;
   status: OrderStatus;
+  paymentMethod: string;
   sellerId: string;
   sellerName?: string;
   trackingNumber?: string;
