@@ -20,14 +20,23 @@ export const SellerOrdersView: React.FC = () => {
 
   useEffect(() => {
     const sellerId = auth.currentUser?.uid || 'anonymous';
-    
-    // Si no hay usuario y no es 'anonymous', podríamos esperar, 
-    // pero incluimos sellerId en las dependencias para que se reinicie
-    const q = query(
-      collection(db, 'orders'), 
-      where('sellerId', '==', sellerId),
-      orderBy('createdAt', 'desc')
-    );
+    const isActuallyAdmin = auth.currentUser && (auth.currentUser.email === 'inboxacolombia@gmail.com' || auth.currentUser.email?.includes('admin'));
+
+    let q;
+    if (isActuallyAdmin) {
+      // Admins see all orders
+      q = query(
+        collection(db, 'orders'), 
+        orderBy('createdAt', 'desc')
+      );
+    } else {
+      // Sellers see their own orders (or anonymous ones if they are anonymous)
+      q = query(
+        collection(db, 'orders'), 
+        where('sellerId', 'in', [sellerId, 'anonymous']),
+        orderBy('createdAt', 'desc')
+      );
+    }
     
     const unsubscribe = onSnapshot(q, 
       (snapshot) => {

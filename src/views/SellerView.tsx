@@ -14,13 +14,15 @@ import {
   ChevronRight,
   Plus,
   Minus,
-  Truck
+  Truck,
+  RefreshCw
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '@/src/lib/utils';
 import { Product, OrderItem } from '@/src/types';
-import { writeToGoogleSheets } from '../services/googleSheetsService';
+import { writeToGoogleSheets, OrderData } from '../services/googleSheetsService';
 import { db, auth } from '../firebase';
+import { useAuth } from '../components/AuthProvider';
 import { 
   collection, 
   addDoc, 
@@ -52,6 +54,7 @@ const MOCK_PRODUCTS: Product[] = [
 
 
 export const SellerView: React.FC = () => {
+  const { profile } = useAuth();
   const [searchTerm, setSearchTerm] = useState('');
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [cart, setCart] = useState<OrderItem[]>([]);
@@ -59,6 +62,7 @@ export const SellerView: React.FC = () => {
   const [products, setProducts] = useState<Product[]>(MOCK_PRODUCTS);
   const [existingCustomers, setExistingCustomers] = useState<any[]>([]);
   const [showCustomerResults, setShowCustomerResults] = useState(false);
+  const [isDataLoading, setIsDataLoading] = useState(false);
 
   // Customer Form State
   const [customerData, setCustomerData] = useState({
@@ -71,29 +75,26 @@ export const SellerView: React.FC = () => {
     shippingCost: ''
   });
 
-  // Load products and customers
-  React.useEffect(() => {
-    const loadData = async () => {
-      try {
-        // Load products
-        const productsSnapshot = await getDocs(query(collection(db, 'products')));
-        if (!productsSnapshot.empty) {
-          const fetchedProducts = productsSnapshot.docs.map(doc => ({ 
-            id: doc.id, 
-            ...doc.data() 
-          })) as Product[];
-          setProducts(fetchedProducts);
-        }
-
-        // Load customers
-        const q = query(collection(db, 'customers'));
-        const snapshot = await getDocs(q);
-        const customers = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        setExistingCustomers(customers);
-      } catch (err) {
-        console.error("Error loading data:", err);
+  const loadData = async () => {
+    setIsDataLoading(true);
+    try {
+      const productsSnapshot = await getDocs(query(collection(db, 'products')));
+      if (!productsSnapshot.empty) {
+        const fetchedProducts = productsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Product[];
+        setProducts(fetchedProducts);
       }
-    };
+      const q = query(collection(db, 'customers'));
+      const snapshot = await getDocs(q);
+      const customers = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setExistingCustomers(customers);
+    } catch (err) {
+      console.error("Error loading data:", err);
+    } finally {
+      setIsDataLoading(false);
+    }
+  };
+
+  React.useEffect(() => {
     loadData();
   }, []);
 
@@ -234,13 +235,20 @@ export const SellerView: React.FC = () => {
       }
 
       // Push to Google Sheets (Non-blocking)
-      writeToGoogleSheets({
+      const sheetData: OrderData = {
         name: customerData.name,
         idNumber: customerData.idNumber,
         phone: customerData.phone,
         address: customerData.address,
-        city: customerData.city
-      }).catch(sheetError => {
+        city: customerData.city,
+        total: total,
+        paymentMethod: customerData.paymentMethod,
+        sellerName: profile?.name || 'Vendedor Anónimo',
+        shippingCost: shipCost,
+        items: cart.map(i => `${i.quantity}x ${i.name}`).join(' | ')
+      };
+
+      writeToGoogleSheets(sheetData).catch(sheetError => {
         console.error("Error pushing to Google Sheets:", sheetError);
       });
       
@@ -305,15 +313,25 @@ export const SellerView: React.FC = () => {
         </div>
 
         {/* Search Bar */}
-        <div className="relative max-w-4xl mx-auto w-full">
-          <Search className="absolute left-6 top-1/2 -translate-y-1/2 text-white/40" size={24} />
-          <input 
-            type="text"
-            placeholder="Escribe para buscar productos..."
-            className="input-field w-full pl-16 h-16 text-xl bg-white/5 border-white/10 focus:border-inboxa-coral/50"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
+        <div className="relative max-w-4xl mx-auto w-full flex gap-3">
+          <div className="relative flex-1">
+            <Search className="absolute left-6 top-1/2 -translate-y-1/2 text-white/40" size={24} />
+            <input 
+              type="text"
+              placeholder="Escribe para buscar productos..."
+              className="input-field w-full pl-16 h-16 text-xl bg-white/5 border-white/10 focus:border-inboxa-coral/50"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+          <button 
+            onClick={loadData}
+            disabled={isDataLoading}
+            className="w-16 h-16 card-glass flex items-center justify-center text-white/40 hover:text-white transition-all"
+            title="Recargar Inventario"
+          >
+            <RefreshCw size={24} className={cn(isDataLoading && "animate-spin")} />
+          </button>
         </div>
 
         {/* Products Grid */}

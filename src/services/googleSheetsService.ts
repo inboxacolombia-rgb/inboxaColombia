@@ -34,6 +34,7 @@ export const syncFromGoogleSheets = async (): Promise<{ success: boolean; count:
             const name = row.Nombre || row.name;
             
             if (idNumber && name) {
+              // It's a Customer
               const customerRef = doc(db, 'customers', String(idNumber).trim());
               await setDoc(customerRef, {
                 idNumber: String(idNumber).trim(),
@@ -46,6 +47,22 @@ export const syncFromGoogleSheets = async (): Promise<{ success: boolean; count:
                 source: 'GoogleSheet-WebApp'
               }, { merge: true });
               importedCount++;
+            } else if (row.SKU || row.Code || row.Codigo) {
+              // It's a Product
+              const code = (row.SKU || row.Code || row.Codigo || '').trim();
+              const pName = (row.Nombre || row.Name || row.Product || '').trim();
+              if (code && pName) {
+                const productRef = doc(db, 'products', code);
+                await setDoc(productRef, {
+                  code: code,
+                  name: pName,
+                  price: parseFloat(row.Precio || row.Price || 0),
+                  stock: parseInt(row.Stock || row.Cantidad || 0),
+                  imageUrl: row.Imagen || row.Image || row.imageUrl || 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=500',
+                  updatedAt: serverTimestamp()
+                }, { merge: true });
+                importedCount++;
+              }
             }
           }
           return { success: true, count: importedCount };
@@ -72,6 +89,7 @@ export const syncFromGoogleSheets = async (): Promise<{ success: boolean; count:
             const name = row.Nombre || row.name;
             
             if (idNumber && name) {
+              // It's a Customer
               const customerRef = doc(db, 'customers', String(idNumber).trim());
               await setDoc(customerRef, {
                 idNumber: String(idNumber).trim(),
@@ -84,6 +102,22 @@ export const syncFromGoogleSheets = async (): Promise<{ success: boolean; count:
                 source: 'GoogleSheet-CSV'
               }, { merge: true });
               importedCount++;
+            } else if (row.SKU || row.Code || row.Codigo) {
+              // It's a Product
+              const code = (row.SKU || row.Code || row.Codigo || '').trim();
+              const pName = (row.Nombre || row.Name || row.Product || '').trim();
+              if (code && pName) {
+                const productRef = doc(db, 'products', code);
+                await setDoc(productRef, {
+                  code: code,
+                  name: pName,
+                  price: parseFloat(row.Precio || row.Price || 0),
+                  stock: parseInt(row.Stock || row.Cantidad || 0),
+                  imageUrl: row.Imagen || row.Image || row.imageUrl || 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=500',
+                  updatedAt: serverTimestamp()
+                }, { merge: true });
+                importedCount++;
+              }
             }
           }
           resolve({ success: true, count: importedCount });
@@ -108,22 +142,34 @@ export const syncFromGoogleSheets = async (): Promise<{ success: boolean; count:
  * 4. Deploy > New Deployment > Web App (Set "Who has access" to "Anyone")
  * 5. Provide the URL here or via env variable.
  */
-export const writeToGoogleSheets = async (data: CustomerData) => {
+export interface OrderData extends CustomerData {
+  total: number;
+  items: string; // Concatenated items for the sheet
+  paymentMethod: string;
+  sellerName: string;
+  shippingCost: number;
+}
+
+export const writeToGoogleSheets = async (data: OrderData) => {
   const WEB_APP_URL = import.meta.env.VITE_GOOGLE_SHEETS_WEBAPP_URL;
   if (!WEB_APP_URL) {
     console.warn("Google Sheets Sync: VITE_GOOGLE_SHEETS_WEBAPP_URL not set. Order not pushed to Sheets.");
     return;
   }
 
-  console.log("Pushing order to Google Sheets:", data.idNumber);
+  console.log("Pushing full order to Google Sheets:", data.idNumber);
   try {
     const response = await fetch(WEB_APP_URL, {
       method: 'POST',
       mode: 'no-cors',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data)
+      body: JSON.stringify({
+        ...data,
+        timestamp: new Date().toISOString(),
+        orderId: Math.random().toString(36).substring(7).toUpperCase()
+      })
     });
-    console.log("Google Sheets response (opaque due to no-cors):", response.type);
+    console.log("Google Sheets response:", response.type);
   } catch (err) {
     console.error("Error writing to Sheet:", err);
   }
