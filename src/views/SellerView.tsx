@@ -20,7 +20,7 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '@/src/lib/utils';
 import { Product, OrderItem } from '@/src/types';
-import { writeToGoogleSheets, OrderData } from '../services/googleSheetsService';
+import { writeToGoogleSheets, syncFromGoogleSheets, OrderData } from '../services/googleSheetsService';
 import { db, auth } from '../firebase';
 import { useAuth } from '../components/AuthProvider';
 import { 
@@ -31,7 +31,8 @@ import {
   query, 
   where, 
   doc, 
-  setDoc
+  setDoc,
+  onSnapshot
 } from 'firebase/firestore';
 import { signInAnonymously } from 'firebase/auth';
 
@@ -78,24 +79,42 @@ export const SellerView: React.FC = () => {
   const loadData = async () => {
     setIsDataLoading(true);
     try {
-      const productsSnapshot = await getDocs(query(collection(db, 'products')));
-      if (!productsSnapshot.empty) {
-        const fetchedProducts = productsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Product[];
-        setProducts(fetchedProducts);
-      }
-      const q = query(collection(db, 'customers'));
-      const snapshot = await getDocs(q);
-      const customers = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      setExistingCustomers(customers);
+      console.log("Sincronizando de Google Sheets a petición del vendedor...");
+      await syncFromGoogleSheets();
     } catch (err) {
-      console.error("Error loading data:", err);
+      console.error("Error al forzar sincronización de Google Sheets:", err);
     } finally {
       setIsDataLoading(false);
     }
   };
 
   React.useEffect(() => {
-    loadData();
+    setIsDataLoading(true);
+    
+    // Live stream products
+    const productsQuery = query(collection(db, 'products'));
+    const unsubscribeProducts = onSnapshot(productsQuery, (snapshot) => {
+      const fetchedProducts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Product[];
+      setProducts(fetchedProducts);
+      setIsDataLoading(false);
+    }, (err) => {
+      console.error("Error al escuchar productos en tiempo real:", err);
+      setIsDataLoading(false);
+    });
+
+    // Live stream customers
+    const customersQuery = query(collection(db, 'customers'));
+    const unsubscribeCustomers = onSnapshot(customersQuery, (snapshot) => {
+      const customers = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setExistingCustomers(customers);
+    }, (err) => {
+      console.error("Error al escuchar clientes en tiempo real:", err);
+    });
+
+    return () => {
+      unsubscribeProducts();
+      unsubscribeCustomers();
+    };
   }, []);
 
   const filteredProducts = useMemo(() => {

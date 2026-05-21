@@ -2,8 +2,11 @@ import Papa from 'papaparse';
 import { db } from '../firebase';
 import { collection, doc, setDoc, serverTimestamp } from 'firebase/firestore';
 
-const SHEET_ID = '1cO-X-MiKA1xb2x09jbzx-61rQBnEk4JhPwD9mR6MewU';
-const CSV_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv`;
+const INVENTORY_SHEET_ID = '1zLLBY2qzxmdPTAC9qrhfSYHilvA9GXZiKFpxPPf0SY0';
+const CUSTOMER_SHEET_ID = '1cO-X-MiKA1xb2x09jbzx-61rQBnEk4JhPwD9mR6MewU';
+
+const INVENTORY_CSV_URL = `https://docs.google.com/spreadsheets/d/${INVENTORY_SHEET_ID}/export?format=csv`;
+const CUSTOMER_CSV_URL = `https://docs.google.com/spreadsheets/d/${CUSTOMER_SHEET_ID}/export?format=csv`;
 
 export interface CustomerData {
   name: string;
@@ -13,120 +16,205 @@ export interface CustomerData {
   city: string;
 }
 
+// Case-insensitive key/header helper
+const getVal = (row: any, keys: string[]): any => {
+  const rowKeys = Object.keys(row);
+  for (const k of keys) {
+    const matched = rowKeys.find(rk => rk.toLowerCase().trim() === k.toLowerCase().trim());
+    if (matched !== undefined && row[matched] !== undefined) {
+      return row[matched];
+    }
+  }
+  return undefined;
+};
+
+// Robust price parser to handle Colombian/global dots & commas
+const parsePrice = (val: any): number => {
+  if (val === undefined || val === null) return 0;
+  let str = String(val).trim();
+  
+  if (str.includes('.') && str.includes(',')) {
+    const lastDot = str.lastIndexOf('.');
+    const lastComma = str.lastIndexOf(',');
+    if (lastDot > lastComma) {
+      str = str.replace(/,/g, '');
+    } else {
+      str = str.replace(/\./g, '').replace(/,/g, '.');
+    }
+  } else if (str.includes('.')) {
+    const parts = str.split('.');
+    if (parts.length > 1 && parts[parts.length - 1].length === 3) {
+      str = str.replace(/\./g, '');
+    }
+  } else if (str.includes(',')) {
+    const parts = str.split(',');
+    if (parts.length > 1 && parts[parts.length - 1].length === 3) {
+      str = str.replace(/,/g, '');
+    } else {
+      str = str.replace(/,/g, '.');
+    }
+  }
+  
+  str = str.replace(/[^0-9.]/g, '');
+  const num = parseFloat(str);
+  return isNaN(num) ? 0 : num;
+};
+
+// Robust integer parser
+const parseStock = (val: any): number => {
+  if (val === undefined || val === null) return 0;
+  let str = String(val).trim();
+  str = str.replace(/[^0-9]/g, '');
+  const num = parseInt(str, 10);
+  return isNaN(num) ? 0 : num;
+};
+
 export const syncFromGoogleSheets = async (): Promise<{ success: boolean; count: number; error?: string }> => {
   const WEB_APP_URL = import.meta.env.VITE_GOOGLE_SHEETS_WEBAPP_URL;
   
   if (!WEB_APP_URL) {
-    console.warn("Inventory Sync: VITE_GOOGLE_SHEETS_WEBAPP_URL not set. Falling back to CSV.");
+    console.warn("Inventory Sync: VITE_GOOGLE_SHEETS_WEBAPP_URL not set. Falling back to CSV URLs.");
   }
   
   try {
-    // Try to sync from Web App URL first if available
+    let importedCount = 0;
+    
+    // 1. Try to sync from Web App URL first if available
     if (WEB_APP_URL) {
       try {
         const response = await fetch(WEB_APP_URL);
         const data = await response.json();
         
         if (Array.isArray(data)) {
-          let importedCount = 0;
           for (const row of data) {
-            const idNumber = row.Cédula || row.Identificacion || row.idNumber || row.ID;
-            const name = row.Nombre || row.name;
-            
-            if (idNumber && name) {
-              // It's a Customer
-              const customerRef = doc(db, 'customers', String(idNumber).trim());
+            // Get possible keys
+            const pCode = getVal(row, ['sku', 'code', 'codigo', 'código', 'id', 'cod', 'cód']);
+            const pName = getVal(row, ['nombre', 'name', 'producto', 'product', 'articulo', 'artículo']);
+            const priceVal = getVal(row, ['precio', 'price', 'venta', 'valor', 'costo', 'precio de venta', 'precios']);
+            const stockVal = getVal(row, ['stock', 'cantidad', 'existencias', 'inventario', 'cant']);
+            const imageUrlVal = getVal(row, ['imagen', 'image', 'imageurl', 'foto', 'link', 'imagen url', 'url de imagen', 'url']);
+
+            const custId = getVal(row, ['cédula', 'cedula', 'idnumber', 'identificacion', 'identificación']);
+            const custName = getVal(row, ['nombre', 'name', 'cliente', 'customer']);
+            const custPhone = getVal(row, ['teléfono', 'telefono', 'celular', 'phone', 'tel']);
+            const custAddress = getVal(row, ['dirección', 'direccion', 'address', 'dir']);
+            const custCity = getVal(row, ['ciudad', 'city', 'pueblo', 'municipio']);
+
+            // Detect if row represents a Product
+            const isProduct = pCode && pName && (
+              priceVal !== undefined || 
+              stockVal !== undefined || 
+              getVal(row, ['sku', 'codigo', 'código', 'cod', 'cód']) !== undefined
+            );
+
+            if (isProduct) {
+              const productRef = doc(db, 'products', String(pCode).trim());
+              await setDoc(productRef, {
+                code: String(pCode).trim(),
+                name: String(pName).trim(),
+                price: parsePrice(priceVal),
+                stock: parseStock(stockVal),
+                imageUrl: imageUrlVal ? String(imageUrlVal).trim() : 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=500',
+                updatedAt: serverTimestamp()
+              }, { merge: true });
+              importedCount++;
+            } else if ((custId || custPhone) && custName) {
+              const idVal = String(custId || custPhone).trim();
+              const customerRef = doc(db, 'customers', idVal);
               await setDoc(customerRef, {
-                idNumber: String(idNumber).trim(),
-                name: String(name).trim(),
-                phone: String(row.Teléfono || row.phone || row.Celular || '').trim(),
-                address: String(row.Dirección || row.address || '').trim(),
-                city: String(row.Ciudad || row.city || '').trim(),
+                idNumber: idVal,
+                name: String(custName).trim(),
+                phone: custPhone ? String(custPhone).trim() : '',
+                address: custAddress ? String(custAddress).trim() : '',
+                city: custCity ? String(custCity).trim() : '',
                 fidelity: 'Conocido',
                 updatedAt: serverTimestamp(),
                 source: 'GoogleSheet-WebApp'
               }, { merge: true });
               importedCount++;
-            } else if (row.SKU || row.Code || row.Codigo) {
-              // It's a Product
-              const code = (row.SKU || row.Code || row.Codigo || '').trim();
-              const pName = (row.Nombre || row.Name || row.Product || '').trim();
-              if (code && pName) {
-                const productRef = doc(db, 'products', code);
-                await setDoc(productRef, {
-                  code: code,
-                  name: pName,
-                  price: parseFloat(row.Precio || row.Price || 0),
-                  stock: parseInt(row.Stock || row.Cantidad || 0),
-                  imageUrl: row.Imagen || row.Image || row.imageUrl || 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=500',
-                  updatedAt: serverTimestamp()
-                }, { merge: true });
-                importedCount++;
-              }
             }
           }
           return { success: true, count: importedCount };
         }
       } catch (e) {
-        console.warn("Web App GET sync failed, falling back to CSV:", e);
+        console.warn("Web App GET sync failed, falling back to direct CSV files:", e);
       }
     }
 
-    // Fallback to direct CSV export
-    const response = await fetch(CSV_URL);
-    const csvData = await response.text();
-    
-    return new Promise((resolve) => {
-      Papa.parse(csvData, {
-        header: true,
-        skipEmptyLines: true,
-        complete: async (results) => {
-          const rows = results.data as any[];
-          let importedCount = 0;
-
-          for (const row of rows) {
-            const idNumber = row.Cédula || row.Identificacion || row.ID;
-            const name = row.Nombre || row.name;
-            
-            if (idNumber && name) {
-              // It's a Customer
-              const customerRef = doc(db, 'customers', String(idNumber).trim());
-              await setDoc(customerRef, {
-                idNumber: String(idNumber).trim(),
-                name: String(name).trim(),
-                phone: String(row.Teléfono || row.phone || row.Celular || '').trim(),
-                address: String(row.Dirección || row.address || '').trim(),
-                city: String(row.Ciudad || row.city || '').trim(),
-                fidelity: 'Conocido',
-                updatedAt: serverTimestamp(),
-                source: 'GoogleSheet-CSV'
-              }, { merge: true });
-              importedCount++;
-            } else if (row.SKU || row.Code || row.Codigo) {
-              // It's a Product
-              const code = (row.SKU || row.Code || row.Codigo || '').trim();
-              const pName = (row.Nombre || row.Name || row.Product || '').trim();
-              if (code && pName) {
-                const productRef = doc(db, 'products', code);
-                await setDoc(productRef, {
-                  code: code,
-                  name: pName,
-                  price: parseFloat(row.Precio || row.Price || 0),
-                  stock: parseInt(row.Stock || row.Cantidad || 0),
-                  imageUrl: row.Imagen || row.Image || row.imageUrl || 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=500',
-                  updatedAt: serverTimestamp()
-                }, { merge: true });
-                importedCount++;
-              }
-            }
-          }
-          resolve({ success: true, count: importedCount });
-        },
-        error: (error: any) => {
-          resolve({ success: false, count: 0, error: error.message });
-        }
+    // 2. Direct CSV Import logic for both Sheets
+    const parseCsvUrl = (url: string): Promise<any[]> => {
+      return new Promise((resolve, reject) => {
+        Papa.parse(url, {
+          download: true,
+          header: true,
+          skipEmptyLines: true,
+          complete: (results) => resolve(results.data),
+          error: (err) => reject(err)
+        });
       });
-    });
+    };
+
+    // Load Products
+    try {
+      console.log("Fetching products CSV...");
+      const productRows = await parseCsvUrl(INVENTORY_CSV_URL);
+      for (const row of productRows) {
+        const pCode = getVal(row, ['sku', 'code', 'codigo', 'código', 'id', 'cod', 'cód']);
+        const pName = getVal(row, ['nombre', 'name', 'producto', 'product', 'articulo', 'artículo']);
+        const priceVal = getVal(row, ['precio', 'price', 'venta', 'valor', 'costo', 'precio de venta', 'precios']);
+        const stockVal = getVal(row, ['stock', 'cantidad', 'existencias', 'inventario', 'cant']);
+        const imageUrlVal = getVal(row, ['imagen', 'image', 'imageurl', 'foto', 'link', 'imagen url', 'url de imagen', 'url']);
+
+        if (pCode && pName) {
+          const productRef = doc(db, 'products', String(pCode).trim());
+          const imageUrl = imageUrlVal ? String(imageUrlVal).trim() : 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=500';
+          await setDoc(productRef, {
+            code: String(pCode).trim(),
+            name: String(pName).trim(),
+            price: parsePrice(priceVal),
+            stock: parseStock(stockVal),
+            imageUrl: imageUrl,
+            updatedAt: serverTimestamp()
+          }, { merge: true });
+          importedCount++;
+        }
+      }
+    } catch (productError) {
+      console.error("Error syncing products Google Sheet:", productError);
+    }
+
+    // Load Customers
+    try {
+      console.log("Fetching customers CSV...");
+      const customerRows = await parseCsvUrl(CUSTOMER_CSV_URL);
+      for (const row of customerRows) {
+        const custId = getVal(row, ['cédula', 'cedula', 'idnumber', 'identificacion', 'identificación']);
+        const custName = getVal(row, ['nombre', 'name', 'cliente', 'customer']);
+        const custPhone = getVal(row, ['teléfono', 'telefono', 'celular', 'phone', 'tel']);
+        const custAddress = getVal(row, ['dirección', 'direccion', 'address', 'dir']);
+        const custCity = getVal(row, ['ciudad', 'city', 'pueblo', 'municipio']);
+
+        if (custName && (custId || custPhone)) {
+          const idVal = String(custId || custPhone).trim();
+          const customerRef = doc(db, 'customers', idVal);
+          await setDoc(customerRef, {
+            idNumber: idVal,
+            name: String(custName).trim(),
+            phone: custPhone ? String(custPhone).trim() : '',
+            address: custAddress ? String(custAddress).trim() : '',
+            city: custCity ? String(custCity).trim() : '',
+            fidelity: 'Conocido',
+            updatedAt: serverTimestamp(),
+            source: 'GoogleSheet-CSV'
+          }, { merge: true });
+          importedCount++;
+        }
+      }
+    } catch (customerError) {
+      console.error("Error syncing customers Google Sheet:", customerError);
+    }
+
+    return { success: true, count: importedCount };
   } catch (error: any) {
     console.error("Sheets Sync Error:", error);
     return { success: false, count: 0, error: error.message };

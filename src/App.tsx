@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import { SellerView } from './views/SellerView';
 import { SellerOrdersView } from './views/SellerOrdersView';
@@ -9,6 +9,7 @@ import { LoginView } from './views/LoginView';
 import { InventoryView } from './views/InventoryView';
 import { UserRole } from './types';
 import { Navigation } from './components/Navigation';
+import { syncFromGoogleSheets } from './services/googleSheetsService';
 
 import { AuthProvider, useAuth } from './components/AuthProvider';
 import { auth } from './firebase';
@@ -89,6 +90,28 @@ function AppRouter() {
 
 // Side Layout Component
 const Layout: React.FC<{ role: UserRole; onLogout: () => void }> = ({ role, onLogout }) => {
+  useEffect(() => {
+    const runSincronismo = async () => {
+      try {
+        console.log("Sincronización automática de Google Sheets (cada 20s) iniciada...");
+        const res = await syncFromGoogleSheets();
+        console.log(`Sincronización automática completada: ${res.count} elementos actualizados.`);
+      } catch (err) {
+        console.error("Fallo la sincronización en segundo plano:", err);
+      }
+    };
+
+    // Run immediately when layout mounts
+    runSincronismo();
+
+    // 20-second automatic refresh interval
+    const intervalId = setInterval(runSincronismo, 20000);
+
+    return () => {
+      clearInterval(intervalId);
+    };
+  }, []);
+
   return (
     <div className="flex min-h-screen bg-inboxa-gray text-white">
       <Navigation role={role} onLogout={onLogout} />

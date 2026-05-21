@@ -11,7 +11,7 @@ import { cn } from '../lib/utils';
 import { UserRole, Product } from '../types';
 import { syncFromGoogleSheets } from '../services/googleSheetsService';
 import { db } from '../firebase';
-import { collection, getDocs, query, orderBy } from 'firebase/firestore';
+import { collection, getDocs, query, orderBy, onSnapshot } from 'firebase/firestore';
 
 interface InventoryViewProps {
   userRole?: UserRole;
@@ -24,11 +24,10 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ userRole = 'admin'
   const [syncing, setSyncing] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
 
-  const loadProducts = async () => {
+  useEffect(() => {
     setLoading(true);
-    try {
-      const q = query(collection(db, 'products'), orderBy('name'));
-      const snapshot = await getDocs(q);
+    const q = query(collection(db, 'products'), orderBy('name'));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
       const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       
       if (data.length > 0) {
@@ -43,23 +42,20 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ userRole = 'admin'
           { name: 'Masajeador 3 Cabezas', sku: 'MASAJ-3C', price: 70000, stock: 15, status: 'Bajo' },
         ]);
       }
-    } catch (err) {
-      console.error("Error loading products:", err);
-    } finally {
       setLoading(false);
-    }
-  };
+    }, (err) => {
+      console.error("Error loading products via onSnapshot:", err);
+      setLoading(false);
+    });
 
-  useEffect(() => {
-    loadProducts();
+    return () => unsubscribe();
   }, []);
 
   const handleSync = async () => {
     setSyncing(true);
     const result = await syncFromGoogleSheets();
     if (result.success) {
-      alert(`Sincronización exitosa: ${result.count} clientes actualizados.`);
-      loadProducts();
+      alert(`Sincronización exitosa: ${result.count} elementos sincronizados.`);
     } else {
       alert(`Error en sincronización: ${result.error}`);
     }
@@ -164,8 +160,9 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ userRole = 'admin'
                       {isAdmin && (
                         <td className="py-4 text-right">
                           <button 
-                            onClick={loadProducts}
+                            onClick={handleSync}
                             className="p-2 opacity-0 group-hover:opacity-100 transition-all text-white/40 hover:text-white"
+                            title="Sincronizar ahora"
                           >
                             <RefreshCw size={16} />
                           </button>
